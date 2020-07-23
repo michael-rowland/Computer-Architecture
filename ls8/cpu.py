@@ -16,9 +16,12 @@ class CPU:
             0b00000001: "HLT",
             0b10000010: "LDI",
             0b01000111: "PRN",
+            0b10100000: "ADD",
             0b10100010: "MUL",
             0b01000101: "PUSH",
             0b01000110: "POP",
+            0b01010000: "CALL",
+            0b00010001: "RET",
         }
         try:
             self.file = sys.argv[1]
@@ -31,7 +34,7 @@ class CPU:
         address = 0
         with open(self.file) as file:
             for line in file:
-                command = line[:8]
+                command = line.split("#")[0]
                 if command == "":
                     continue
                 instruction = int(command, 2)
@@ -99,9 +102,19 @@ class CPU:
                 print(self.reg[operand_a])
             if self.instructions[command] == "MUL":
                 self.alu("MUL", operand_a, operand_b)
+            if self.instructions[command] == "ADD":
+                self.alu("ADD", operand_a, operand_b)
             if self.instructions[command] == "PUSH":
                 self.reg[7] -= 1
                 self.ram_write(self.reg[7], self.reg[operand_a])
             if self.instructions[command] == "POP":
                 self.reg[operand_a] = self.ram_read(self.reg[7])
                 self.reg[7] += 1
+            if self.instructions[command] == "CALL":
+                self.reg[7] -= 1
+                self.ram_write(self.reg[7], ir)
+                ir = self.reg[operand_a]
+            if self.instructions[command] == "RET":
+                ret_address = self.ram_read(self.reg[7])
+                self.reg[7] += 1
+                ir = ret_address
