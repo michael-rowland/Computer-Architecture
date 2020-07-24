@@ -22,6 +22,10 @@ class CPU:
             0b01000110: "POP",
             0b01010000: "CALL",
             0b00010001: "RET",
+            0b10100111: "CMP",
+            0b01010100: "JMP",
+            0b01010101: "JEQ",
+            0b01010110: "JNE",
         }
         try:
             self.file = sys.argv[1]
@@ -51,12 +55,17 @@ class CPU:
         self.ram[self.mar] = self.mdr
 
     def alu(self, op, reg_a, reg_b):
-        """ALU operations."""
-
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.fl = 0b00000100
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.fl = 0b00000010
+            else:
+                self.fl = 0b00000001
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -84,37 +93,48 @@ class CPU:
 
         print()
 
+    def jump(self):
+        self.pc = self.reg[self.operand_a]
+
     def run(self):
         """Run the CPU."""
-        ir = self.pc
-
         running = True
         while running:
-            command = self.ram[ir]
-            operand_a = self.ram_read(ir + 1)
-            operand_b = self.ram_read(ir + 2)
-            ir += 1 + (command >> 6)
+            command = self.ram[self.pc]
+            self.operand_a = self.ram_read(self.pc + 1)
+            self.operand_b = self.ram_read(self.pc + 2)
+            self.pc += 1 + (command >> 6)
             if self.instructions[command] == "HLT":
                 running = False
             if self.instructions[command] == "LDI":
-                self.reg[operand_a] = operand_b
+                self.reg[self.operand_a] = self.operand_b
             if self.instructions[command] == "PRN":
-                print(self.reg[operand_a])
+                print(self.reg[self.operand_a])
             if self.instructions[command] == "MUL":
-                self.alu("MUL", operand_a, operand_b)
+                self.alu("MUL", self.operand_a, self.operand_b)
             if self.instructions[command] == "ADD":
-                self.alu("ADD", operand_a, operand_b)
+                self.alu("ADD", self.operand_a, self.operand_b)
             if self.instructions[command] == "PUSH":
                 self.reg[7] -= 1
-                self.ram_write(self.reg[7], self.reg[operand_a])
+                self.ram_write(self.reg[7], self.reg[self.operand_a])
             if self.instructions[command] == "POP":
-                self.reg[operand_a] = self.ram_read(self.reg[7])
+                self.reg[self.operand_a] = self.ram_read(self.reg[7])
                 self.reg[7] += 1
             if self.instructions[command] == "CALL":
                 self.reg[7] -= 1
-                self.ram_write(self.reg[7], ir)
-                ir = self.reg[operand_a]
+                self.ram_write(self.reg[7], self.pc)
+                self.pc = self.reg[self.operand_a]
             if self.instructions[command] == "RET":
                 ret_address = self.ram_read(self.reg[7])
                 self.reg[7] += 1
-                ir = ret_address
+                self.pc = ret_address
+            if self.instructions[command] == "CMP":
+                self.alu("CMP", self.operand_a, self.operand_b)
+            if self.instructions[command] == "JMP":
+                self.jump()
+            if self.instructions[command] == "JEQ":
+                if self.fl == 0b00000001:
+                    self.jump()
+            if self.instructions[command] == "JNE":
+                if self.fl & 0b00000001 == 0:
+                    self.jump()
